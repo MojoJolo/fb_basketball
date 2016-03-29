@@ -44,10 +44,10 @@
                 scored = false;
 
                 score_style = {
-                    font: "18px Arial"
+                    font: "15px Arial"
                 }
 
-                this.score_text = game.add.text(0, 0, "High Score: " + high_score + "\nScore: " + score, score_style);
+                this.score_text = game.add.text(0, 0, "Generations: " + {{ gen }} + "\nHigh Score: " + high_score + "\nScore: " + score, score_style);
                 // high_score_text.anchor.set(0.5);
 
                 // SETUP UP BASKETBALL BOARD
@@ -121,17 +121,42 @@
 
                 $.get("{{ url_for('computeGA') }}",
                     {
-                        currX: this.ball.x, currY: this.ball.y, targetX: this.ring_mid.x, targetY: this.ring_mid.y
+                        currX: this.ball.x, currY: this.ball.y,
+                        targetX: this.ring_mid.x, targetY: this.ring_mid.y,
+                        generations: {{ gen }}
                     },
                     function(data) {
                     // $( ".result" ).html( data );
-                    var angle = data['angle'];
 
-                    console.log(angle)
+                    var population = data['population']
+                    var fittest = data['fittest']
+
+                    for (var i = 0; i < population.length; i++) {
+                        angle = population[i]
+
+                        line_x_end = game_ball.x + Math.cos(angle) * 1000
+                        line_y_end = game_ball.y + Math.sin(angle) * 1000
+
+                        var graphics = game.add.graphics(0, 0);
+                        graphics.lineStyle(1, "0xFF0000");
+
+                        graphics.moveTo(game_ball.x, game_ball.y);
+                        graphics.lineTo(line_x_end, line_y_end);
+                    }
+
+                    line_x_end = game_ball.x + Math.cos(fittest) * 1000
+                    line_y_end = game_ball.y + Math.sin(fittest) * 1000
+
+                    var graphics = game.add.graphics(0, 0);
+
+                    graphics.lineStyle(2, "0x00FF00");
+
+                    graphics.moveTo(game_ball.x, game_ball.y);
+                    graphics.lineTo(line_x_end, line_y_end);
 
                     game.physics.p2.gravity.y = 2400;
-                    game_ball.body.velocity.x = Math.cos(angle) * 1500;
-                    game_ball.body.velocity.y = Math.sin(angle) * 1500;
+                    game_ball.body.velocity.x = Math.cos(fittest) * 1500;
+                    game_ball.body.velocity.y = Math.sin(fittest) * 1500;
                     isMoved = true;
                 });
 
@@ -217,7 +242,7 @@
                     if(score > high_score)
                         high_score = score
 
-                    this.score_text.text = "High Score: " + high_score + "\nScore: " + score
+                    this.score_text.text = "Generations: " + {{ gen }} + "\nHigh Score: " + high_score + "\nScore: " + score, score_style
                     this.ring_mid.body.static = false;
                 }
             }
