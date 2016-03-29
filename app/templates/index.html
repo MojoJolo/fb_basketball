@@ -1,0 +1,238 @@
+<!DOCTYPE html>  
+<html>
+<head>  
+    <meta charset="utf-8" />
+    <title>Basketball Game</title>
+
+    <script src="{{ url_for('static', filename='js/jquery-1.12.0.min.js') }}" charset="utf-8"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/phaser.min.js') }}"></script>
+
+    <script type="text/javascript">
+        var width = 375;
+        var height = 600;
+        var min_scale = 0.30;
+        var max_scale = 0.5;
+        var ring_start_y = 192;
+
+        var ball_start = -1;
+
+        var game = new Phaser.Game(width, height);
+        var score = 0;
+        var score_increment = 0;
+        var scored = false;
+        var high_score = 0;
+
+        // Create our 'main' state that will contain the game
+        var mainState = {
+            preload: function() { 
+                // This function will be executed at the beginning     
+                // That's where we load the images and sounds 
+                game.load.image('board', "{{ url_for('static', filename='img/board.jpg') }}");
+                game.load.image('ball', "{{ url_for('static', filename='img/ball.png') }}");
+                game.load.image('ring', "{{ url_for('static', filename='img/ring.jpg') }}");
+                game.load.image('under', "{{ url_for('static', filename='img/under.jpg') }}");
+                game.load.image('mid_ring', "{{ url_for('static', filename='img/ring.jpg') }}");
+            },
+
+            create: function() { 
+                game.stage.backgroundColor = '#fff';
+                game.physics.startSystem(Phaser.Physics.P2JS);
+                game.physics.p2.restitution = 0.75;
+                game.physics.p2.gravity.y = 0;
+
+                score_increment = 1;
+                scored = false;
+
+                score_style = {
+                    font: "18px Arial"
+                }
+
+                this.score_text = game.add.text(0, 0, "High Score: " + high_score + "\nScore: " + score, score_style);
+                // high_score_text.anchor.set(0.5);
+
+                // SETUP UP BASKETBALL BOARD
+                this.board = game.add.sprite(0, 0, 'board');
+                this.board.scale.setTo(max_scale, max_scale);
+
+                this.board.x = (width / 2) - (this.board.width / 2);
+                this.board.y = 80;
+
+                // SETUP UP BASKETBALL BOTTOM
+                this.under = game.add.sprite(0, 0, 'under');
+                this.under.scale.setTo(max_scale, max_scale);
+                
+                this.under.y = height - this.under.height;
+
+                // SETUP UP BASKETBALL RING
+
+                this.ring = game.add.sprite(0, 0, 'ring');
+                this.ring.scale.setTo(max_scale, max_scale);
+
+                this.ring.x = (width / 2) - (this.ring.width / 2);
+                this.ring.y = ring_start_y;
+
+                // game.physics.p2.enable(this.ring);
+
+                // SETUP UP BASKETBALL BALL
+
+                this.ball = game.add.sprite(0, 0, 'ball');
+                this.ball.scale.setTo(max_scale, max_scale);
+
+                if(ball_start < 0) {
+                    ball_start = width / 2
+                }
+
+                this.ball.x = ball_start
+                this.ball.y = height - 70;
+
+                this.ball_start_x = this.ball.x;
+                this.ball_start_y = this.ball.y;
+
+                game.physics.p2.enable(this.ball);
+                
+                this.ball.body.setCircle(32);
+                this.ball.body.onBeginContact.add(collisionHandler, this);
+                // this.ball.body.collideWorldBounds = false;
+
+                // SET UP COLLISSION BOXES
+                this.ring_left = game.add.sprite(0, 0);
+                this.ring_right = game.add.sprite(0, 0);
+                this.ring_mid = game.add.sprite(0, 0, 'mid_ring');
+
+                this.ring_left.x = this.ring.x;
+                this.ring_left.y = this.ring.y + 5;
+                this.ring_left.scale.x = 0.01;
+                this.ring_left.scale.y = 0.2;
+
+                this.ring_right.x = this.ring.x + this.ring.width;
+                this.ring_right.y = this.ring.y + 5
+                this.ring_right.scale.x = 0.01;
+                this.ring_right.scale.y = 0.2;
+
+                this.ring_mid.x = width / 2;
+                this.ring_mid.y = this.ring.y + 20;
+                this.ring_mid.scale.x = 0.01;
+                this.ring_mid.scale.y = 0.01;
+
+                this.isShot = false;
+                game_ball = this.ball;
+
+                var targetX = this.ring_mid.x
+
+                $.get("{{ url_for('computeGA') }}",
+                    {
+                        currX: this.ball.x, currY: this.ball.y, targetX: this.ring_mid.x, targetY: this.ring_mid.y
+                    },
+                    function(data) {
+                    // $( ".result" ).html( data );
+                    var angle = data['angle'];
+
+                    console.log(angle)
+
+                    game.physics.p2.gravity.y = 2400;
+                    game_ball.body.velocity.x = Math.cos(angle) * 1500;
+                    game_ball.body.velocity.y = Math.sin(angle) * 1500;
+                    isMoved = true;
+                });
+
+                // // SWIPE CONTROLS
+                // var swipeCoordX, swipeCoordY, swipeCoordX2, swipeCoordY2, swipeMinDistance = 25;
+                // var isMoved = false;
+                // this.isShot = false;
+
+                // game.input.onDown.add(function(pointer) {
+                //     swipeCoordX = pointer.clientX;
+                //     swipeCoordY = pointer.clientY;
+                // }, this);
+
+                // game.input.onUp.add(function(pointer) {
+                //     swipeCoordX2 = pointer.clientX;
+                //     swipeCoordY2 = pointer.clientY;
+
+                //     var angle = Math.atan2(swipeCoordY2 - swipeCoordY, swipeCoordX2 - swipeCoordX)
+
+                //     if(angle < -0.75 && angle > -2.25 && !isMoved) {
+                //         // this.ball.body.gravity.y = 2600;
+                //         game.physics.p2.gravity.y = 2400;
+                //         this.ball.body.velocity.x = Math.cos(angle) * 1500;
+                //         this.ball.body.velocity.y = Math.sin(angle) * 1500;
+                //         isMoved = true;
+                //     }
+
+                // }, this);      
+            },
+
+            update: function() {
+                if(this.ball.y + this.ball.height + 100 < 0 || this.ball.y > height)
+                    this.restartGame();
+
+                if(this.ball.x + this.ball.width + 100 < 0 || this.ball.x - this.ball.width > width)
+                    this.restartGame();
+
+                if(this.ball_start_y > this.ball.y && this.ball.scale.x > min_scale) {
+                    this.ball.scale.setTo(this.ball.scale.x - 0.004, this.ball.scale.y - 0.004);
+                }
+
+                if(this.ball.y + this.ball.height < this.ring.y) {
+                    if(!this.isShot) {
+                        game.world.swap(this.ring, this.ball);
+                        game.world.swap(this.ball, this.under);
+                        this.isShot = true;
+                    }
+
+                    game.physics.p2.enable(this.ring_left);
+                    game.physics.p2.enable(this.ring_right);
+                    game.physics.p2.enable(this.ring_mid, true);
+
+                    this.ring_left.body.static = true
+                    this.ring_right.body.static = true
+                    this.ring_mid.body.static = true
+                }
+
+                ball_start = Math.random() * (width - 50 - 50) + 50
+                // ball_start = 50
+            },
+
+            render: function() {
+                // game.add.text("High Score: " + high_score, 32, 32);
+            },
+
+            restartGame: function() {
+                // Start the 'main' state, which restarts the game
+                if(!scored)
+                    score = 0;
+
+                game.state.start('main');
+            },
+        };
+
+        function collisionHandler (body, bodyB, shapeA, shapeB, equation) {
+            if(body)
+            {
+                if(body.sprite.key != null && body.sprite.key == "mid_ring"){
+                    score += score_increment;
+                    score_increment = 0;
+                    scored = true;
+
+                    if(score > high_score)
+                        high_score = score
+
+                    this.score_text.text = "High Score: " + high_score + "\nScore: " + score
+                    this.ring_mid.body.static = false;
+                }
+            }
+            else
+            {
+                this.restartGame();
+            }
+        }
+
+        // Add and start the 'main' state to start the game
+        game.state.add('main', mainState);  
+        game.state.start('main'); 
+    </script>
+</head>
+<body>
+
+</body>  
+</html>  
